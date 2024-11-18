@@ -1,10 +1,10 @@
 const bedrock = require('bedrock-protocol')
 
 const botConfig = {
-    // host: 'laughtale.my.id',
-    // port: 7004,
-    host: 'localhost',
-    port: 3000,
+    host: 'laughtale.my.id',
+    port: 7004,
+    // host: 'localhost',
+    // port: 3000,
     username: 'Bonk',
     offline: false,
     connectTimeout: 20000,
