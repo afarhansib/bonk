@@ -17,6 +17,7 @@
   "author": "afarhansib",
   "license": "Unlicense",
   "dependencies": {
-    "bedrock-protocol": "^3.41.0"
+    "bedrock-protocol": "^3.41.0",
+    "mineflayer": "^4.23.0"
   }
 }
