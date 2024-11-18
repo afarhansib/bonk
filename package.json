@@ -1,0 +1,22 @@
+{
+  "name": "bonk",
+  "version": "1.0.0",
+  "description": "Minecraft Bedrock Bot.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "github.com/afarhansib/bonk"
+  },
+  "keywords": [
+    "minecraft",
+    "bedrock"
+  ],
+  "author": "afarhansib",
+  "license": "Unlicense",
+  "dependencies": {
+    "bedrock-protocol": "^3.41.0"
+  }
+}
