@@ -1,21 +1,54 @@
-const mineflayer = require('mineflayer')
+import mineflayer from 'mineflayer'
+import chalk from 'chalk'
+import readline from 'readline'
+
+const rl = readline.createInterface({
+  input: process.stdin,
+  output: process.stdout
+})
 
 const bot = mineflayer.createBot({
-  host: 'localhost', // minecraft server ip
-  username: 'Bot', // username to join as if auth is `offline`, else a unique identifier for this account. Switch if you want to change accounts
-  auth: 'offline', // for offline mode servers, you can set this to 'offline'
-  port: 7000,              // set if you need a port that isn't 25565
-  // version: false,           // only set if you need a specific version or snapshot (ie: "1.8.9" or "1.16.5"), otherwise it's set automatically
-  // password: '12345678'      // set if you want to use password-based auth (may be unreliable). If specified, the `username` must be an email
+  host: 'localhost',
+  username: 'Bonk',
+  auth: 'offline',
+  port: 7000,
 })
 
-bot.on('chat', (username, message) => {
-//   if (username === bot.username) return
-  bot.chat(message)
-    console.log(username)
-    console.log(message)
+rl.on('line', (line) => {
+  bot.chat(line)
 })
 
-// Log errors and kick reasons:
-bot.on('kicked', console.log)
-bot.on('error', console.log)
+bot.on('message', (jsonMsg) => {
+  // console.log(jsonMsg)
+  if (jsonMsg.text) {
+    console.log(chalk.yellow(jsonMsg.text))
+    return
+  }
+
+  if (jsonMsg.json.extra) {
+    const username = jsonMsg.json.extra[0][""] || jsonMsg.json.extra[1].text.trim()
+    const message = jsonMsg.json.extra[jsonMsg.json.extra.length - 1].text
+    if (jsonMsg.json.extra.length === 3) {
+      // console.log('yotbuafk')
+      console.log(chalk.cyan(username + jsonMsg.json.extra[1].text + '>') + chalk.white(message.slice(1)))
+      return
+    }
+    console.log(chalk.cyan(username + '>') + chalk.white(message.slice(1)))
+  }
+})
+
+bot.on('login', () => {
+  console.log(chalk.green.bold('Bot logged in successfully'))
+})
+
+bot.on('spawn', () => {
+  console.log(chalk.green('Bot spawned in game'))
+})
+
+bot.on('error', (err) => {
+  console.log(chalk.red.bold('Error: ') + chalk.red(err))
+})
+
+bot.on('kicked', (reason) => {
+  console.log(chalk.red.bold('Kicked: ') + chalk.red(reason))
+})
