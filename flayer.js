@@ -15,9 +15,9 @@ rl.on('line', (line) => {
     try {
       currentBot.chat(line)
     } catch (e) {
-      console.log(chalk.red('Server not responding. Forcing reconnect...'))
-      clearInterval(globalHealthCheck)
-      currentBot.end()
+      console.log(chalk.red('currentBot disappeared. Waiting for reconnect...'))
+        // clearInterval(globalHealthCheck)
+        // currentBot.end()
     }
   }
 })
@@ -47,9 +47,9 @@ function createBot() {
       try {
         currentBot.chat('/ping')
       } catch (e) {
-        console.log(chalk.red('Server not responding to pings. Forcing reconnect...'))
-        clearInterval(globalHealthCheck)
-        currentBot.end()
+        console.log(chalk.red('currentBot disappeared. Waiting for reconnect...'))
+        // clearInterval(globalHealthCheck)
+        // currentBot.end()
       }
 
       setTimeout(() => {
