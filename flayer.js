@@ -12,7 +12,13 @@ const rl = readline.createInterface({
 
 rl.on('line', (line) => {
   if (currentBot) {
-    currentBot.chat(line)
+    try {
+      currentBot.chat(line)
+    } catch (e) {
+      console.log(chalk.red('Server not responding. Forcing reconnect...'))
+      clearInterval(globalHealthCheck)
+      currentBot.end()
+    }
   }
 })
 
@@ -64,7 +70,7 @@ function createBot() {
     pingSuccess = true
 
     const date = new Date()
-    const shortDate = date.toLocaleString('en-US', { month: 'short' }) + ' ' + date.getDate() + ',' 
+    const shortDate = date.toLocaleString('en-US', { month: 'short' }) + ' ' + date.getDate() + ','
     const time = date.toLocaleTimeString('en-US', { hour12: false })
     const timestamp = `${shortDate} ${time}`
 
