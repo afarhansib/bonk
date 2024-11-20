@@ -99,6 +99,11 @@ function createBot() {
   })
 
   currentBot.on('error', (err) => {
+    if (err.message === 'ETIMEDOUT') {
+      console.log(chalk.yellow('Connection timed out during server restart. Retrying in 5 seconds...'))
+      setTimeout(createBot, 5000)
+      return
+    }
     console.log(chalk.red.bold('Error: ') + chalk.red(JSON.stringify(err, null, 2)))
   })
 
