@@ -38,7 +38,13 @@ function createBot() {
   globalHealthCheck = setInterval(() => {
     if (pingSuccess) {
       pingSuccess = false
-      currentBot.chat('/ping')
+      try {
+        currentBot.chat('/ping')
+      } catch (e) {
+        console.log(chalk.red('Server not responding to pings. Forcing reconnect...'))
+        clearInterval(globalHealthCheck)
+        currentBot.end()
+      }
 
       setTimeout(() => {
         if (!pingSuccess) {
