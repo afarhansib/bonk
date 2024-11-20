@@ -115,6 +115,7 @@ function createBot() {
 
   currentBot.on('end', () => {
     console.log(chalk.yellow('Disconnected. Reconnecting in 5 seconds...'))
+    clearInterval(globalHealthCheck)
     setTimeout(createBot, 5000)
   })
 
