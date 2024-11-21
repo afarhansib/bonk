@@ -16,108 +16,114 @@ rl.on('line', (line) => {
       currentBot.chat(line)
     } catch (e) {
       console.log(chalk.red('currentBot disappeared. Waiting for reconnect...'))
-        // clearInterval(globalHealthCheck)
-        // currentBot.end()
+      // clearInterval(globalHealthCheck)
+      // currentBot.end()
     }
   }
 })
 
 function createBot() {
-  if (currentBot) {
-    currentBot.removeAllListeners()
-    currentBot.end()
-  }
+  try {
+    if (currentBot) {
+      currentBot.removeAllListeners()
+      currentBot.end()
+    }
 
-  if (globalHealthCheck) {
-    clearInterval(globalHealthCheck)
-  }
+    if (globalHealthCheck) {
+      clearInterval(globalHealthCheck)
+    }
 
-  currentBot = mineflayer.createBot({
-    host: 'localhost',
-    username: 'Bonk',
-    auth: 'offline',
-    port: 7000,
-  })
+    currentBot = mineflayer.createBot({
+      host: 'localhost',
+      username: 'Bonk',
+      auth: 'offline',
+      port: 7000,
+    })
 
-  let pingSuccess = true
+    let pingSuccess = true
 
-  globalHealthCheck = setInterval(() => {
-    if (pingSuccess) {
-      pingSuccess = false
-      try {
-        currentBot.chat('/ping')
-      } catch (e) {
-        console.log(chalk.red('currentBot disappeared. Waiting for reconnect...'))
-        // clearInterval(globalHealthCheck)
-        // currentBot.end()
-      }
-
-      setTimeout(() => {
-        if (!pingSuccess) {
-          console.log(chalk.yellow('Server not responding to pings. Forcing reconnect...'))
-          clearInterval(globalHealthCheck)
-          currentBot.end()
+    globalHealthCheck = setInterval(() => {
+      if (pingSuccess) {
+        pingSuccess = false
+        try {
+          currentBot.chat('/ping')
+        } catch (e) {
+          console.log(chalk.red('currentBot disappeared. Waiting for reconnect...'))
+          // clearInterval(globalHealthCheck)
+          // currentBot.end()
         }
-      }, 5000)
-    }
-  }, 60000)
 
-  currentBot.once('end', () => {
-    clearInterval(globalHealthCheck)
-  })
+        setTimeout(() => {
+          if (!pingSuccess) {
+            console.log(chalk.yellow('Server not responding to pings. Forcing reconnect...'))
+            clearInterval(globalHealthCheck)
+            currentBot.end()
+          }
+        }, 5000)
+      }
+    }, 60000)
 
-  currentBot.on('message', (jsonMsg) => {
-    pingSuccess = true
+    currentBot.once('end', () => {
+      clearInterval(globalHealthCheck)
+    })
 
-    const date = new Date()
-    const shortDate = date.toLocaleString('en-US', { month: 'short' }) + ' ' + date.getDate() + ','
-    const time = date.toLocaleTimeString('en-US', { hour12: false })
-    const timestamp = `${shortDate} ${time}`
+    currentBot.on('message', (jsonMsg) => {
+      pingSuccess = true
 
-    if (jsonMsg.text) {
-      console.log(`${chalk.gray(`[${timestamp}]`)} ${chalk.yellow(jsonMsg.text)}`)
-      return
-    }
+      const date = new Date()
+      const shortDate = date.toLocaleString('en-US', { month: 'short' }) + ' ' + date.getDate() + ','
+      const time = date.toLocaleTimeString('en-US', { hour12: false })
+      const timestamp = `${shortDate} ${time}`
 
-    if (jsonMsg.json.extra) {
-      const username = jsonMsg.json.extra[0][""] || jsonMsg.json.extra[1].text.trim()
-      const message = jsonMsg.json.extra[jsonMsg.json.extra.length - 1].text
-      if (jsonMsg.json.extra.length === 3) {
-        console.log(`${chalk.gray(`[${timestamp}]`)} ${chalk.cyan(username + jsonMsg.json.extra[1].text + '>')} ${chalk.white(message.slice(1))}`)
+      if (jsonMsg.text) {
+        console.log(`${chalk.gray(`[${timestamp}]`)} ${chalk.yellow(jsonMsg.text)}`)
         return
       }
-      console.log(`${chalk.gray(`[${timestamp}]`)} ${chalk.cyan(username + '>')} ${chalk.white(message.slice(1))}`)
-    }
-  })
 
-  currentBot.on('login', () => {
-    console.log(chalk.green.bold('Bot logged in successfully'))
-  })
+      if (jsonMsg.json.extra) {
+        const username = jsonMsg.json.extra[0][""] || jsonMsg.json.extra[1].text.trim()
+        const message = jsonMsg.json.extra[jsonMsg.json.extra.length - 1].text
+        if (jsonMsg.json.extra.length === 3) {
+          console.log(`${chalk.gray(`[${timestamp}]`)} ${chalk.cyan(username + jsonMsg.json.extra[1].text + '>')} ${chalk.white(message.slice(1))}`)
+          return
+        }
+        console.log(`${chalk.gray(`[${timestamp}]`)} ${chalk.cyan(username + '>')} ${chalk.white(message.slice(1))}`)
+      }
+    })
 
-  currentBot.on('spawn', () => {
-    console.log(chalk.green('Bot spawned in game'))
-  })
+    currentBot.on('login', () => {
+      console.log(chalk.green.bold('Bot logged in successfully'))
+    })
 
-  currentBot.on('error', (err) => {
-    if (err.message === 'ETIMEDOUT') {
-      console.log(chalk.yellow('Connection timed out during server restart. Retrying in 5 seconds...'))
+    currentBot.on('spawn', () => {
+      console.log(chalk.green('Bot spawned in game'))
+    })
+
+    currentBot.on('error', (err) => {
+      if (err.message === 'ETIMEDOUT') {
+        console.log(chalk.yellow('Connection timed out during server restart. Retrying in 5 seconds...'))
+        setTimeout(createBot, 5000)
+        return
+      }
+      console.log(chalk.red.bold('Error: ') + chalk.red(JSON.stringify(err, null, 2)))
+    })
+
+    currentBot.on('kicked', (reason) => {
+      console.log(chalk.red.bold('Kicked: ') + chalk.red(JSON.stringify(reason, null, 2)))
+      console.log(chalk.yellow('Reconnecting in 5 seconds...'))
       setTimeout(createBot, 5000)
-      return
-    }
-    console.log(chalk.red.bold('Error: ') + chalk.red(JSON.stringify(err, null, 2)))
-  })
+    })
 
-  currentBot.on('kicked', (reason) => {
-    console.log(chalk.red.bold('Kicked: ') + chalk.red(JSON.stringify(reason, null, 2)))
-    console.log(chalk.yellow('Reconnecting in 5 seconds...'))
-    setTimeout(createBot, 5000)
-  })
+    currentBot.on('end', () => {
+      console.log(chalk.yellow('Disconnected. Reconnecting in 5 seconds...'))
+      clearInterval(globalHealthCheck)
+      setTimeout(createBot, 5000)
+    })
 
-  currentBot.on('end', () => {
-    console.log(chalk.yellow('Disconnected. Reconnecting in 5 seconds...'))
-    clearInterval(globalHealthCheck)
+  } catch (err) {
+    console.log(chalk.red.bold('Connection Error: ') + chalk.red(err.message))
     setTimeout(createBot, 5000)
-  })
+  }
 
   return currentBot
 }
