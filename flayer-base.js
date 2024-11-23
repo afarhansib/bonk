@@ -34,6 +34,22 @@ function createBot() {
         port: 7000,
     })
 
+    const events = [
+        'physicsTick',
+        'health',
+        'move',
+        'entityMoved',
+        'entityUpdate',
+        'packet',
+        'time'
+    ]
+
+    events.forEach(event => {
+        currentBot.on(event, () => {
+            console.log(`EVENT_PING: ${event}`)
+        })
+    })
+
     currentBot.on('message', (jsonMsg) => {
         const date = new Date()
         const shortDate = date.toLocaleString('en-US', { month: 'short' }) + ' ' + date.getDate() + ','
