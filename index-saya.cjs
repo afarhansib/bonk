@@ -5,14 +5,14 @@ const path = require('path')
 
 const botConfig = {
     host: 'laughtale.my.id',
-    port: 7004,
+    port: 7040,
     // host: 'localhost',
     // port: 3000,
     username: 'Bonk',
     offline: false,
     connectTimeout: 20000,
     skipPing: true,
-    profilesFolder: './profiles',
+    profilesFolder: './profiles-saya',
 }
 
 class BonkBot {
@@ -104,6 +104,35 @@ class BonkBot {
     setupEventHandlers() {
         console.log('Setting up event handlers...')
 
+        let runtimeEntityId;
+
+        this.client.on('start_game', (packet) => {
+            runtimeEntityId = packet.runtime_entity_id
+            console.log(`Runtime Entity ID saved: ${runtimeEntityId}`);
+        });
+
+
+        this.client.on('start_game', (packet) => {
+            this.client.queue('serverbound_loading_screen', {
+                "type": 1
+            })
+            this.client.queue('serverbound_loading_screen', {
+                "type": 2
+            })
+            this.client.queue('interact', {
+                "action_id": "mouse_over_entity",
+                "target_entity_id": 0n,
+                "position": {
+                    "x": 0,
+                    "y": 0,
+                    "z": 0
+                }
+            })
+            this.client.queue('set_local_player_as_initialized', {
+                "runtime_entity_id": `${runtimeEntityId}`
+            })
+        })
+
         this.client.on('join', () => {
             console.log('Bonk joined the server! ' + this.reconnectAttempts)
             // this.setupGameplayEvents()
@@ -144,7 +173,7 @@ class BonkBot {
                 this.currentSlot = packet.data.params.slot
                 // console.log(`Current hotbar slot: ${this.currentSlot}`)
             }
-            
+
             // Track inventory contents
             if (packet?.data?.name === 'inventory_content') {
                 // console.log('Inventory contents:')
