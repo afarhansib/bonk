@@ -4,7 +4,8 @@
   "description": "Minecraft Bedrock Bot.",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "saya": "node index-saya.cjs"
   },
   "repository": {
     "type": "git",
