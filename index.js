@@ -17,7 +17,7 @@ function getFormattedTimestamp() {
 }
 
 // Load the .lang file
-const langFilePath = path.join(__dirname, 'en_US.lang'); // Replace with the correct path
+const langFilePath = path.join(__dirname, 'minecraft-bedrock-us.lang'); // Replace with the correct path
 const langFileContent = fs.readFileSync(langFilePath, 'utf8');
 
 // Parse the .lang file into a key-value object

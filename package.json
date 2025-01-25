@@ -4,8 +4,7 @@
   "description": "Minecraft Bedrock Bot.",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "saya": "node index-saya.cjs"
+    "test": "echo \"Error: no test specified\" && exit 1"
   },
   "repository": {
     "type": "git",
@@ -19,12 +18,6 @@
   "author": "afarhansib",
   "license": "Unlicense",
   "dependencies": {
-    "axios": "^1.7.9",
-    "bedrock-protocol": "^3.42.2",
-    "chalk": "^5.3.0",
-    "mineflayer": "^4.23.0"
-  },
-  "devDependencies": {
-    "pm2": "^5.4.3"
+    "bedrock-protocol": "^3.42.0"
   }
 }
