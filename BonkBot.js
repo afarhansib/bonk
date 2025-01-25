@@ -6,6 +6,9 @@ import path from 'path'
 import config from './config.js'
 import { log } from './utils/logger.js'
 import { loadLangFile } from './utils/langLoader.js'
+import { fileURLToPath } from 'url'
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 export default class BonkBot {
     constructor() {
@@ -216,16 +219,19 @@ export default class BonkBot {
         this.client.on('packet', (packet) => {
             // console.log(packet)
             if (packet?.data?.name === 'player_skin') {
-                // console.log('Received skin packet:', packet.data)
-                // Store the skin packet
-                const skinsDir = path.join(__dirname, 'skins')
+                const skinsDir = path.join(__dirname, 'skins');
                 if (!fs.existsSync(skinsDir)) {
-                    fs.mkdirSync(skinsDir)
+                    fs.mkdirSync(skinsDir);
                 }
+
+                const timestamp = new Date().toISOString().replace(/[:.]/g, '-'); // e.g., 2023-10-05T12-34-56-789Z
+                const skinFilePath = path.join(skinsDir, `captured_skin_${timestamp}.json`);
+
                 fs.writeFileSync(
-                    path.join(skinsDir, 'captured_skin.json'),
+                    skinFilePath,
                     JSON.stringify(packet.data.params, null, 2)
-                )
+                );
+                console.log('Skin saved:', skinFilePath);
             }
 
             if (packet?.data?.name === 'inventory_slot') {
