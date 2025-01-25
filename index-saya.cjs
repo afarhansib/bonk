@@ -14,7 +14,7 @@ function getFormattedTimestamp() {
     const minutes = String(now.getUTCMinutes()).padStart(2, '0');
     const seconds = String(now.getUTCSeconds()).padStart(2, '0');
     return `${hours}:${minutes}:${seconds}`;
-  }
+}
 
 // Load the .lang file
 const langFilePath = path.join(__dirname, 'en_US.lang'); // Replace with the correct path
@@ -37,6 +37,9 @@ const colors = {
     blue: '\x1b[34m',
     red: '\x1b[31m',
     gray: '\x1b[90m',
+    cyan: '\x1b[36m',
+    magenta: '\x1b[35m',
+    white: '\x1b[37m',
     reset: '\x1b[0m',
 };
 
@@ -55,18 +58,27 @@ function log(type, message) {
             coloredType = `${colors.red}[${type}]${colors.reset}`;
             break;
         default:
-            coloredType = `[${type}]`;
+            coloredType = `[${type}]${colors.reset}`;
             break;
     }
 
-    console.log(`${colors.gray}${timestamp}${colors.reset} ${coloredType} ${message}`);
+    // Highlight join and left messages
+    if (message.includes('joined the game')) {
+        console.log(`${colors.gray}${timestamp}${colors.reset} ${coloredType} ${colors.white}[${colors.cyan}+${colors.white}]${colors.reset} ${colors.cyan}${message}${colors.reset}`);
+    } else if (message.includes('left the game')) {
+        console.log(`${colors.gray}${timestamp}${colors.reset} ${coloredType} ${colors.white}[${colors.magenta}-${colors.white}]${colors.reset} ${colors.magenta}${message}${colors.reset}`);
+    } else {
+        console.log(`${colors.gray}${timestamp}${colors.reset} ${coloredType} ${message}`);
+    }
 }
 
 const botConfig = {
-    host: 'laughtale.my.id',
-    port: 7040,
+    // host: 'laughtale.my.id',
+    // port: 7040,
     // host: 'localhost',
     // port: 3000,
+    host: 'play.yotbu.my.id',
+    port: 19132,
     username: 'Bonk',
     offline: false,
     connectTimeout: 20000,
@@ -76,73 +88,69 @@ const botConfig = {
 
 class BonkBot {
     constructor() {
-        this.client = null
-        this.reconnectAttempts = 0
-        this.maxReconnectAttempts = 10
-        this.reconnectDelay = 5000
-        this.isServerDown = false
-        this.running = true
-        this.isConnected = false
-        this.isConnecting = false
-        this.heartbeatInterval = null
+        this.client = null;
+        this.reconnectAttempts = 0;
+        this.maxReconnectAttempts = 10;
+        this.reconnectDelay = 30000;
+        this.isServerDown = false;
+        this.running = true;
+        this.isConnected = false;
+        this.isConnecting = false;
 
-        this.currentSlot = 0
-        this.inventory = {}
+        this.currentSlot = 0;
+        this.inventory = {};
     }
 
     async connect() {
-        if (this.isConnecting || this.isConnected) return
+        // console.log('Connecting to server...');
+        if (this.isConnecting || this.isConnected) return;
+        console.log('Continuing to connect to server...');
 
         while (this.running && !this.isConnected) {
             try {
-                this.isConnecting = true
-                await bedrock.ping({ host: botConfig.host, port: botConfig.port })
-                // console.log('first client check, ', this.client)
-                if (this.client) {
-                    this.client.removeAllListeners()
-                    this.client = null
-                }
-                this.client = bedrock.createClient(botConfig)
-                // console.log('second client check, ', this.client)
-                this.setupEventHandlers()
-                this.setupHeartbeat()
-                this.reconnectAttempts = 0
-                this.isServerDown = false
-                break
-            } catch (error) {
-                console.error('Connection error:', error)
-                this.isServerDown = true
-                this.isConnecting = false
-                await this.handleReconnect()
-            }
-        }
-    }
+                this.isConnecting = true;
 
-    setupHeartbeat() {
-        if (this.heartbeatInterval) {
-            clearInterval(this.heartbeatInterval)
-        }
-
-        this.heartbeatInterval = setInterval(async () => {
-            // Only proceed with ping check if we're not already confirmed connected
-            if (!this.isConnected || !this.client) {
-                try {
-                    await bedrock.ping({ host: botConfig.host, port: botConfig.port })
-                } catch (error) {
-                    console.log('Server heartbeat failed, initiating reconnect...')
-                    this.isConnected = false
-                    this.isServerDown = true
-                    if (this.client) {
-                        this.client.removeAllListeners()
-                        this.client = null
+                // Retry ping up to 3 times with a delay
+                let pingSuccess = false;
+                for (let i = 0; i < 3; i++) {
+                    try {
+                        await bedrock.ping({ host: botConfig.host, port: botConfig.port, timeout: 10000 }); // Increase timeout to 10 seconds
+                        pingSuccess = true;
+                        break;
+                    } catch (error) {
+                        console.error(`Ping attempt ${i + 1} failed:`, error.message);
+                        await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds before retrying
                     }
-                    this.handleReconnect()
                 }
+
+                if (!pingSuccess) {
+                    throw new Error('All ping attempts failed');
+                }
+
+                if (this.client) {
+                    this.client.removeAllListeners();
+                    this.client.close();
+                    this.client = null;
+                }
+
+                this.client = bedrock.createClient(botConfig);
+                this.setupEventHandlers();
+                this.reconnectAttempts = 0;
+                this.isServerDown = false;
+                break;
+            } catch (error) {
+                console.error('Connection error:', error);
+                this.isServerDown = true;
+                this.isConnecting = false;
             }
-        }, 5000)
+        }
     }
 
     sendChat(message) {
+        if (!this.client || !this.client.queue) {
+            console.error('Client is not connected. Cannot send chat message.');
+            return;
+        }
         this.client.queue('text', {
             type: 'chat',
             needs_translation: false,
@@ -151,7 +159,7 @@ class BonkBot {
             filtered_message: '',
             xuid: '',
             platform_chat_id: ''
-        })
+        });
     }
 
     sendSkinPacket() {
@@ -313,7 +321,6 @@ class BonkBot {
                 console.log('Bonk disconnected:', packet.message)
                 this.isConnected = false
                 this.isConnecting = false
-                this.handleReconnect()
             }
         })
 
@@ -321,7 +328,6 @@ class BonkBot {
             console.log('Connection closed')
             this.isConnected = false
             this.isConnecting = false
-            this.handleReconnect()
         })
 
         this.client.on('error', (err) => {
@@ -329,7 +335,6 @@ class BonkBot {
             this.isServerDown = true
             this.isConnected = false
             this.isConnecting = false
-            this.handleReconnect()
         })
     }
 
@@ -340,38 +345,17 @@ class BonkBot {
         return item ? JSON.stringify(item) : 'empty'
     }
 
-    async handleReconnect() {
-        if (this.isConnecting) return
-
-        if (this.reconnectAttempts < this.maxReconnectAttempts) {
-            this.reconnectAttempts++
-            console.log(`Attempting to reconnect (${this.reconnectAttempts}/${this.maxReconnectAttempts})...`)
-
-            const delay = this.isServerDown ? this.reconnectDelay * 2 : this.reconnectDelay
-
-            await new Promise(resolve => setTimeout(resolve, delay))
-
-            if (this.client) {
-                // this.client.removeAllListeners()
-                this.client = null
-            }
-            await this.connect()
-        } else {
-            console.log('Max reconnection attempts reached. Resetting counter and continuing...')
-            this.reconnectAttempts = 0
-            await new Promise(resolve => setTimeout(resolve, this.reconnectDelay * 2))
-            await this.connect()
-        }
-    }
-
     stop() {
-        this.running = false
+        this.running = false;
         if (this.heartbeatInterval) {
-            clearInterval(this.heartbeatInterval)
+            clearInterval(this.heartbeatInterval);
         }
         if (this.client) {
-            this.client.close()
+            this.client.removeAllListeners();
+            this.client.close();
+            this.client = null;
         }
+        console.log('Bot has been stopped.');
     }
 }
 
@@ -385,7 +369,7 @@ const startBot = async () => {
             await bonk.connect()
             await new Promise(resolve => setTimeout(resolve, 5000))
         } catch (error) {
-            console.log('Bot crashed, restarting...')
+            console.log('Bot failed to connect, restarting...')
             await new Promise(resolve => setTimeout(resolve, 5000))
         }
     }
@@ -423,3 +407,8 @@ rl.on('line', (input) => {
 })
 
 startBot()
+
+// setInterval(() => {
+//     const memoryUsage = process.memoryUsage();
+//     console.log(`Memory usage: RSS=${memoryUsage.rss / 1024 / 1024} MB, HeapUsed=${memoryUsage.heapUsed / 1024 / 1024} MB`);
+// }, 10000); // Log memory usage every 10 seconds
