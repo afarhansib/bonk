@@ -18,6 +18,7 @@
   "author": "afarhansib",
   "license": "Unlicense",
   "dependencies": {
-    "bedrock-protocol": "^3.42.0"
+    "bedrock-protocol": "^3.42.0",
+    "dotenv": "^16.4.7"
   }
 }
