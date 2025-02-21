@@ -16,5 +16,5 @@ export default {
   // Other Settings
   offline: process.env.BONK_OFFLINE_MODE === 'true',
   connectTimeout: parseInt(process.env.BONK_CONNECT_TIMEOUT) || 20000,
-  profilesFolder: path.join(__dirname, process.env.BONK_PROFILES_FOLDER || './profiles')
+  profilesFolder: path.join(__dirname, process.env.BONK_PROFILES_FOLDER || './profiles'),
 }
