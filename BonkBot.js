@@ -7,6 +7,7 @@ import config from './config.js'
 import { log } from './utils/logger.js'
 import { loadLangFile } from './utils/langLoader.js'
 import { fileURLToPath } from 'url'
+import { sendToLmStudio } from './lmStudioApi.js'; // Import the LM Studio API handler
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -25,6 +26,8 @@ export default class BonkBot {
 
         this.currentSlot = 0;
         this.inventory = {};
+
+        this.botUsername = config.username
     }
 
     async connect() {
@@ -145,8 +148,8 @@ export default class BonkBot {
             this.reconnectAttempts = 0
         })
 
-        this.client.on('text', (packet) => {
-            // console.log(packet)
+        this.client.on('text', async (packet) => {
+            // console.log(packet.type)
             // Helper function to remove Minecraft formatting codes
             function removeFormattingCodes(text) {
                 return text.replace(/§[0-9a-fk-or]/g, '');
@@ -166,6 +169,27 @@ export default class BonkBot {
                         const chatText = messageObj.rawtext[0].text;
                         const cleanText = removeFormattingCodes(chatText);
                         log(`CHAT`, `${cleanText}`);
+                        // console.log(JSON.stringify(messageObj, null, 2))
+                        // console.log(chatText)
+                        // console.log(cleanText)
+                        // Extract player name from parentheses or angle brackets
+                        const playerNameMatchParentheses = cleanText.match(/\(([^)]+)\)/); // Match (name)
+                        const playerNameMatchAngleBrackets = cleanText.match(/<([^>]+)>/); // Match <name>
+                        const playerName = playerNameMatchParentheses
+                            ? playerNameMatchParentheses[1]
+                            : playerNameMatchAngleBrackets
+                                ? playerNameMatchAngleBrackets[1]
+                                : 'Unknown';
+                        console.log(`Received chat: <${playerName}> ${cleanText}`);
+                        if (cleanText.includes(this.botUsername)) {
+                            const query = cleanText.split(this.botUsername)[1]?.trim(); // Extract query after bot's username
+                            if (query) {
+                                const reply = await sendToLmStudio(query); // Send query to LM Studio API
+                                this.sendChat(` §l[§r§1Qwen AI§r§l]§r @${playerName}: ${reply.replace(/[^ -~]/g, '')}`); // Respond to the user
+                            } else {
+                                this.sendChat(` §l[§r§1Qwen AI§r§l]§r @${playerName}: Please provide a question after tagging me.`);
+                            }
+                        }
                     } catch (error) {
                         log(`ERROR`, `Failed to parse JSON message: ${packet.message}`);
                     }
@@ -208,6 +232,22 @@ export default class BonkBot {
                     const playerName = packet.source_name;
                     const chatMessage = packet.message;
                     log(`CHAT`, `<${playerName}> ${chatMessage}`);
+                    const cleanText = removeFormattingCodes(chatMessage);
+                    log(`CHAT`, `${cleanText}`);
+                    // console.log(JSON.stringify(messageObj, null, 2))
+                    // console.log(chatText)
+                    // console.log(cleanText)
+                    // Extract player name from parentheses or angle brackets
+                    console.log(`Received chat: <${playerName}> ${cleanText}`);
+                    if (cleanText.includes(this.botUsername)) {
+                        const query = cleanText.split(this.botUsername)[1]?.trim(); // Extract query after bot's username
+                        if (query) {
+                            const reply = await sendToLmStudio(query); // Send query to LM Studio API
+                            this.sendChat(` §l[§r§1Qwen AI§r§l]§r @${playerName}: ${reply.replace(/[^ -~]/g, '')}`); // Respond to the user
+                        } else {
+                            this.sendChat(` §l[§r§1Qwen AI§r§l]§r @${playerName}: Please provide a question after tagging me.`);
+                        }
+                    }
                     break;
 
                 default:
