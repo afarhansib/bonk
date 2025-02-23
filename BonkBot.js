@@ -10,8 +10,10 @@ import { fileURLToPath } from 'url'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
+const langStrings = loadLangFile()
+
 export default class BonkBot {
-    constructor() {
+    constructor(options = null) {
         this.client = null;
         this.reconnectAttempts = 0;
         this.maxReconnectAttempts = 10;
@@ -21,7 +23,12 @@ export default class BonkBot {
         this.isConnected = false;
         this.isConnecting = false;
 
-        this.langStrings = loadLangFile()
+        // Use provided options or fall back to config
+        this.config = options || config;
+
+        // Check if using custom logger or default console.log
+        this.isCustomLogger = options?.logger && options.logger !== console.log;
+        this.logger = options?.logger || console.log;
 
         this.currentSlot = 0;
         this.inventory = {};
@@ -30,7 +37,7 @@ export default class BonkBot {
     async connect() {
         // console.log('Connecting to server...');
         if (this.isConnecting || this.isConnected) return;
-        console.log('Continuing to connect to server...');
+        this.logger('Continuing to connect to server...');
 
         while (this.running && !this.isConnected) {
             try {
@@ -40,11 +47,15 @@ export default class BonkBot {
                 let pingSuccess = false;
                 for (let i = 0; i < 3; i++) {
                     try {
-                        await bedrock.ping({ host: config.host, port: config.port, timeout: 10000 }); // Increase timeout to 10 seconds
+                        await bedrock.ping({
+                            host: this.config.host,
+                            port: this.config.port,
+                            timeout: 10000
+                        }); // Increase timeout to 10 seconds
                         pingSuccess = true;
                         break;
                     } catch (error) {
-                        console.error(`Ping attempt ${i + 1} failed:`, error.message);
+                        this.logger(`Ping attempt ${i + 1} failed:`, error.message);
                         await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds before retrying
                     }
                 }
@@ -60,18 +71,33 @@ export default class BonkBot {
                 }
 
                 this.client = bedrock.createClient({
-                    host: config.host,
-                    port: config.port,
-                    username: config.username,
-                    offline: config.offline,
-                    profilesFolder: config.profilesFolder
+                    host: this.config.host,
+                    port: this.config.port,
+                    username: this.config.username,
+                    offline: this.config.offline,
+                    profilesFolder: this.config.profilesFolder,
+                    conLog: (...args) => {
+                        const message = args.join(' ');
+                        if (this.isCustomLogger) {
+                            this.logger(`AUTH: ${message}`);
+                        } else {
+                            log('AUTH', message);
+                        }
+                    },
+                    onMsaCode: (code) => {
+                        if (this.isCustomLogger) {
+                            this.logger(`AUTH: ${code?.message}`);
+                        } else {
+                            log('AUTH', code?.message);
+                        }
+                    },
                 })
                 this.setupEventHandlers();
                 this.reconnectAttempts = 0;
                 this.isServerDown = false;
                 break;
             } catch (error) {
-                console.error('Connection error:', error);
+                this.logger('Connection error:', error);
                 this.isServerDown = true;
                 this.isConnecting = false;
             }
@@ -80,7 +106,7 @@ export default class BonkBot {
 
     sendChat(message) {
         if (!this.client || !this.client.queue) {
-            console.error('Client is not connected. Cannot send chat message.');
+            this.logger('Client is not connected. Cannot send chat message.');
             return;
         }
         this.client.queue('text', {
@@ -96,18 +122,18 @@ export default class BonkBot {
 
     sendSkinPacket() {
         const skinPacket = JSON.parse(fs.readFileSync(path.join(__dirname, 'skins', 'captured_skin.json')))
-        console.log(skinPacket)
+        this.logger(skinPacket)
         this.client.queue('player_skin', skinPacket)
     }
 
     setupEventHandlers() {
-        console.log('Setting up event handlers...')
+        this.logger('Setting up event handlers...')
 
         let runtimeEntityId;
 
         this.client.on('start_game', (packet) => {
             runtimeEntityId = packet.runtime_entity_id
-            // console.log(`Runtime Entity ID saved: ${runtimeEntityId}`);
+            // this.logger(`Runtime Entity ID saved: ${runtimeEntityId}`);
         });
 
 
@@ -133,31 +159,35 @@ export default class BonkBot {
         })
 
         this.client.on('join', () => {
-            console.log('Bonk joined the server! ' + this.reconnectAttempts)
+            this.logger('Bonk joined the server! ' + this.reconnectAttempts)
             // this.setupGameplayEvents()
-            // console.log(this.client)
+            // this.logger(this.client)
             this.isConnected = true
             this.isConnecting = false
         })
 
         this.client.on('spawn', () => {
-            console.log('Bonk spawned in the world!')
+            this.logger('Bonk spawned in the world!')
             this.reconnectAttempts = 0
         })
 
         this.client.on('text', (packet) => {
-            // console.log(packet)
+            // this.logger(packet)
             // Helper function to remove Minecraft formatting codes
             function removeFormattingCodes(text) {
                 return text.replace(/§[0-9a-fk-or]/g, '');
             }
             const params = packet?.parameters
-            //console.log(`Chat message: ${packet.message} ${params ? " + params: " + JSON.stringify(params) : ''}`)
+            //this.logger(`Chat message: ${packet.message} ${params ? " + params: " + JSON.stringify(params) : ''}`)
             switch (packet.type) {
                 case 'json_whisper':
                     const messageObj = JSON.parse(packet.message);
                     const chatText = messageObj.rawtext[0].text;
-                    log(`CHAT`, `${chatText}`);
+                    if (this.isCustomLogger) {
+                        this.logger(`CHAT: ${chatText}`);
+                    } else {
+                        log(`CHAT`, `${chatText}`);
+                    }
                     break;
 
                 case 'json':
@@ -165,9 +195,17 @@ export default class BonkBot {
                         const messageObj = JSON.parse(packet.message);
                         const chatText = messageObj.rawtext[0].text;
                         const cleanText = removeFormattingCodes(chatText);
-                        log(`CHAT`, `${cleanText}`);
+                        if (this.isCustomLogger) {
+                            this.logger(`CHAT: ${cleanText}`);
+                        } else {
+                            log(`CHAT`, `${cleanText}`);
+                        }
                     } catch (error) {
-                        log(`ERROR`, `Failed to parse JSON message: ${packet.message}`);
+                        if (this.isCustomLogger) {
+                            this.logger(`ERROR: Failed to parse JSON message: ${packet.message}`);
+                        } else {
+                            log(`ERROR`, `Failed to parse JSON message: ${packet.message}`);
+                        }
                     }
                     break;
 
@@ -176,14 +214,14 @@ export default class BonkBot {
                     const translationKey = packet.message.replace(/§[0-9a-fk-or]/g, '').replace(/^%/, '');
 
                     // Get the translated message from the .lang file
-                    let readableMessage = this.langStrings[translationKey] || translationKey;
+                    let readableMessage = langStrings[translationKey] || translationKey;
 
                     // Resolve nested translation keys in parameters
                     const params = (packet.parameters || []).map(param => {
                         if (typeof param === 'string' && param.startsWith('%')) {
                             // Remove the % prefix and resolve the nested key
                             const nestedKey = param.replace(/^%/, '');
-                            return this.langStrings[nestedKey] || param; // Use the resolved value or fallback to the original
+                            return langStrings[nestedKey] || param; // Use the resolved value or fallback to the original
                         }
                         return param; // Return the parameter as-is if it's not a translation key
                     });
@@ -201,23 +239,35 @@ export default class BonkBot {
                         });
                     }
 
-                    log(`EVENT`, `${readableMessage}`);
+                    if (this.isCustomLogger) {
+                        this.logger(`EVENT: ${readableMessage}`);
+                    } else {
+                        log(`EVENT`, `${readableMessage}`);
+                    }
                     break;
 
                 case 'chat':
                     const playerName = packet.source_name;
                     const chatMessage = packet.message;
-                    log(`CHAT`, `<${playerName}> ${chatMessage}`);
+                    if (this.isCustomLogger) {
+                        this.logger(`CHAT: <${playerName}> ${chatMessage}`);
+                    } else {
+                        log(`CHAT`, `${cleanText}`);
+                    }
                     break;
 
                 default:
-                    log(`UNKNOWN`, `${JSON.stringify(packet)}`);
+                    if (this.isCustomLogger) {
+                        this.logger(`UNKNOWN: ${JSON.stringify(packet)}`);
+                    } else {
+                        log(`UNKNOWN`, `${JSON.stringify(packet)}`);
+                    }
                     break;
             }
         })
 
         this.client.on('packet', (packet) => {
-            // console.log(packet)
+            // this.logger(packet)
             if (packet?.data?.name === 'player_skin') {
                 const skinsDir = path.join(__dirname, 'skins');
                 if (!fs.existsSync(skinsDir)) {
@@ -231,42 +281,42 @@ export default class BonkBot {
                     skinFilePath,
                     JSON.stringify(packet.data.params, null, 2)
                 );
-                console.log('Skin saved:', skinFilePath);
+                this.logger('Skin saved:', skinFilePath);
             }
 
             if (packet?.data?.name === 'inventory_slot') {
-                // console.log('Inventory slot packet received:')
-                // console.log(packet)
+                // this.logger('Inventory slot packet received:')
+                // this.logger(packet)
                 this.currentSlot = packet.data.params.slot
-                // console.log(`Current hotbar slot: ${this.currentSlot}`)
+                // this.logger(`Current hotbar slot: ${this.currentSlot}`)
             }
 
             // Track inventory contents
             if (packet?.data?.name === 'inventory_content') {
-                // console.log('Inventory contents:')
-                // console.log(packet)
+                // this.logger('Inventory contents:')
+                // this.logger(packet)
                 this.inventory = packet.data.params.input
                 const currentItem = this.inventory[this.currentSlot]
-                // console.log(`Current item: ${currentItem ? currentItem.name : 'empty'}`)
+                // this.logger(`Current item: ${currentItem ? currentItem.name : 'empty'}`)
             }
         })
 
         this.client.on('disconnect', (packet) => {
             if (!packet.message.includes('serverIdConflict')) {
-                console.log('Bonk disconnected:', packet.message)
+                this.logger('Bonk disconnected:', packet.message)
                 this.isConnected = false
                 this.isConnecting = false
             }
         })
 
         this.client.on('close', () => {
-            console.log('Connection closed')
+            this.logger('Connection closed')
             this.isConnected = false
             this.isConnecting = false
         })
 
         this.client.on('error', (err) => {
-            console.error('Error:', err)
+            this.logger('Error:', err)
             this.isServerDown = true
             this.isConnected = false
             this.isConnecting = false
@@ -275,7 +325,7 @@ export default class BonkBot {
 
     // Add this new method to get current item info
     getCurrentItem() {
-        // console.log(this.inventory)
+        // this.logger(this.inventory)
         const item = this.inventory[this.currentSlot]
         return item ? JSON.stringify(item) : 'empty'
     }
@@ -290,6 +340,6 @@ export default class BonkBot {
             this.client.close();
             this.client = null;
         }
-        console.log('Bot has been stopped.');
+        this.logger('Bot has been stopped.');
     }
 }

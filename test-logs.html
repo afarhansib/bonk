@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Bot Logs Test</title>
+    <style>
+        body {
+            font-family: 'Courier New', Courier, monospace;
+        }
+    </style>
+</head>
+
+<body>
+    <h2>Bot Logs</h2>
+    <div id="logs" style="border: 1px solid #ccc; padding: 10px; height: 400px; overflow-y: auto;"></div>
+    <script>
+        const API_KEY = 'nsgin0-32894-h-gh-93wh-g3'; // Replace with your API key
+        const BOT_ID = 'yotbuafk'; // Replace with your bot ID
+
+        async function connectWebSocket() {
+            // First get a token
+            const tokenResponse = await fetch('http://localhost:3000/bot/logs/token', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'x-api-key': API_KEY
+                },
+                body: JSON.stringify({ botId: BOT_ID })
+            });
+            const { token } = await tokenResponse.json();
+
+            // Then connect WebSocket with token
+            const ws = new WebSocket(`ws://localhost:3000/bot/logs?token=${token}`);
+            return ws;
+        }
+
+        const logsDiv = document.getElementById('logs');
+        async function init() {
+            const ws = await connectWebSocket();
+
+            ws.onopen = () => {
+                addLog('Connected to WebSocket');
+            };
+
+            ws.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                if (data.type === 'history') {
+                    // Add all historical logs
+                    data.logs.forEach(log => {
+                        addLog(`${log.message}`);
+                    });
+                } else {
+                    // Handle regular log messages
+                    addLog(`${data.message || JSON.stringify(data)}`);
+                }
+            };
+
+            ws.onclose = () => {
+                addLog('Disconnected from WebSocket');
+            };
+        }
+
+        function addLog(message) {
+            const p = document.createElement('p');
+            p.textContent = `${new Date().toLocaleString()} - ${message}`;
+            logsDiv.appendChild(p);
+            logsDiv.scrollTop = logsDiv.scrollHeight;
+        }
+
+        init();
+    </script>
+</body>
+
+</html>
