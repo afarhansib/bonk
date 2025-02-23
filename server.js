@@ -7,8 +7,49 @@ import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 import crypto from 'crypto';
+import { colors, getFormattedTimestamp } from './utils/logger.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+// Read configuration from .profiles/index.json
+const configPath = path.join(__dirname, '.profiles', 'index.json');
+let botsConfig = [];
+
+function loadBotsConfig() {
+    try {
+        const configContent = fs.readFileSync(configPath, 'utf8');
+        botsConfig = JSON.parse(configContent);
+        return botsConfig;
+    } catch (error) {
+        console.error('Error loading bots config:', error);
+        return [];
+    }
+}
+
+// Watch for changes in the config file
+fs.watch(configPath, (eventType) => {
+    if (eventType === 'change') {
+        console.log('Config file changed, reloading bots...');
+        const newConfig = loadBotsConfig();
+        
+        // Stop disabled bots
+        for (const [botId, botData] of activeBots.entries()) {
+            const botConfig = newConfig.find(c => c.botId === botId);
+            if (!botConfig || botConfig.disabled) {
+                console.log(`Stopping bot ${botId}`);
+                botData.bot?.stop();
+                activeBots.delete(botId);
+            }
+        }
+
+        // Start new or enabled bots
+        for (const config of newConfig) {
+            if (!config.disabled && !activeBots.has(config.botId)) {
+                startBotFromConfig(config);
+            }
+        }
+    }
+});
 
 const app = express();
 app.use(express.json());
@@ -26,6 +67,7 @@ app.use(cors({
     methods: ['GET', 'POST'],
     allowedHeaders: ['Content-Type', 'x-api-key']
 }));
+
 // Middleware to check API key
 app.use((req, res, next) => {
     const providedKey = req.headers['x-api-key'];
@@ -35,7 +77,71 @@ app.use((req, res, next) => {
     next();
 });
 
-// Start a bot instance
+// Start a bot instance from config
+async function startBotFromConfig(config) {
+    const botId = config.botId;
+    const botProfilePath = path.join(__dirname, 'xbox-profiles', botId);
+    
+    if (!fs.existsSync(botProfilePath)) {
+        fs.mkdirSync(botProfilePath, { recursive: true });
+    }
+
+    // Create custom logger for this bot
+    const logHandler = (message) => {
+        const logEntry = {
+            timestamp: Date.now(),
+            type: 'log',
+            botId,
+            message
+        };
+
+        const botData = activeBots.get(botId);
+        if (botData) {
+            botData.logs.push(logEntry);
+            if (botData.logs.length > 1000) {
+                botData.logs.shift();
+            }
+
+            if (botData.ws) {
+                botData.ws.send(JSON.stringify(logEntry));
+            }
+        }
+        if (process.env.SHOW_LOGS === 'true') {
+            const timestamp = getFormattedTimestamp()
+            console.log(`${colors.gray}${timestamp}${colors.reset} [${botId}] ${message}`)
+        }
+    };
+
+    const bot = new BonkBot({
+        host: config.serverIp,
+        port: config.serverPort,
+        profilesFolder: botProfilePath,
+        username: config.botUsername,
+        offline: Boolean(config.botOfflineMode),
+        logger: logHandler
+    });
+
+    // Initialize bot data structure
+    if (!activeBots.has(botId)) {
+        activeBots.set(botId, { bot: null, logs: [], ws: null });
+    }
+
+    const botData = activeBots.get(botId);
+    botData.bot = bot;
+
+    // Start reconnection loop
+    while (true) {
+        try {
+            await bot.connect();
+            await new Promise(resolve => setTimeout(resolve, 5000));
+        } catch (error) {
+            logHandler(`Bot failed to connect, restarting in 5 seconds...`);
+            await new Promise(resolve => setTimeout(resolve, 5000));
+        }
+    }
+}
+
+// Start a bot instance through API
 app.post('/bot/start', async (req, res) => {
     const {
         botId,
@@ -54,61 +160,29 @@ app.post('/bot/start', async (req, res) => {
         return res.status(400).json({ error: 'Bot already running' });
     }
 
-    const botProfilePath = path.join(__dirname, 'profiles', botId);
-    if (!fs.existsSync(botProfilePath)) {
-        fs.mkdirSync(botProfilePath, { recursive: true });
-    }
-
     try {
-        // If bot entry doesn't exist, create it
-        if (!activeBots.has(botId)) {
-            activeBots.set(botId, { bot: null, logs: [], ws: null });
-        }
-
-        // Create custom logger for this bot
-        // In the logHandler function within /bot/start endpoint
-        const logHandler = (message) => {
-            // Create log entry with timestamp
-            const logEntry = {
-                timestamp: Date.now(),
-                type: 'log',
+        // Add new bot to config file
+        const config = loadBotsConfig();
+        const existingConfig = config.find(c => c.botId === botId);
+        
+        if (!existingConfig) {
+            config.push({
                 botId,
-                message
-            };
-
-            // Add to logs array, limit to 1000 entries
-            const botData = activeBots.get(botId);
-            botData.logs.push(logEntry);
-            if (botData.logs.length > 1000) {
-                botData.logs.shift(); // Remove oldest log
-            }
-
-            // Send to WebSocket if connected
-            if (botData.ws) {
-                botData.ws.send(JSON.stringify(logEntry));
-            }
-        };
-
-        const bot = new BonkBot({
-            host: serverIp,
-            port: parseInt(serverPort),
-            profilesFolder: botProfilePath,
-            username: botUsername,
-            offline: Boolean(botOfflineMode),
-            logger: logHandler
-        });
-
-        // Update the bot in the activeBots map
-        activeBots.get(botId).bot = bot;
-
-        await bot.connect();
-        res.json({ status: 'started', botId });
-    } catch (error) {
-        // Only remove the bot instance, keep the WebSocket if it exists
-        if (activeBots.has(botId)) {
-            activeBots.get(botId).bot = null;
+                serverIp,
+                serverPort,
+                botUsername,
+                botOfflineMode,
+                disabled: false
+            });
+            
+            fs.writeFileSync(configPath, JSON.stringify(config, null, 4));
         }
-        res.status(500).json({ error: error.message });
+
+        // Bot will be started by the file watcher
+        res.json({ status: 'Bot configuration added' });
+    } catch (error) {
+        console.error('Error starting bot:', error);
+        res.status(500).json({ error: 'Failed to start bot' });
     }
 });
 
@@ -172,6 +246,16 @@ app.post('/bot/logs/token', (req, res) => {
 const PORT = process.env.PORT || 3000;
 const server = app.listen(PORT, () => {
     console.log(`Bonk API server running on port ${PORT}`);
+    
+    // Start all enabled bots from config
+    const configs = loadBotsConfig();
+    for (const config of configs) {
+        if (!config.disabled) {
+            startBotFromConfig(config).catch(err => {
+                console.error(`Failed to start bot ${config.botId}:`, err);
+            });
+        }
+    }
 });
 
 // Update the upgrade handler

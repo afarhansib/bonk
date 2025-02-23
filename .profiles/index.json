@@ -1,0 +1,26 @@
+[
+    {
+        "botId": "1",
+        "serverIp": "localhost",
+        "serverPort": 19132,
+        "botUsername": "Bonk",
+        "botOfflineMode": true,
+        "disabled": false
+    },
+    {
+        "botId": "0195333b-73fa-7a54-ab8e-8772b4582b08",
+        "serverIp": "localhost",
+        "serverPort": 19132,
+        "botUsername": "Bonk",
+        "botOfflineMode": false,
+        "disabled": true
+    },
+    {
+        "botId": "sayaafk",
+        "serverIp": "laughtale.my.id",
+        "serverPort": 7040,
+        "botUsername": "sayaafk",
+        "botOfflineMode": false,
+        "disabled": false
+      }
+]

@@ -1,7 +1,7 @@
 import config from '../config.js'
 
 // Helper function to format timestamp as HH:MM:SS with offset
-function getFormattedTimestamp() {
+export function getFormattedTimestamp() {
     const now = new Date();
     const utcHours = now.getUTCHours();
     const localHours = (utcHours + config.timeZoneOffset + 24) % 24; // Adjust for offset and wrap around if needed
@@ -12,7 +12,7 @@ function getFormattedTimestamp() {
 }
 
 // ANSI color codes
-const colors = {
+export const colors = {
     green: '\x1b[32m',
     blue: '\x1b[34m',
     red: '\x1b[31m',
