@@ -22,5 +22,23 @@
         "botUsername": "sayaafk",
         "botOfflineMode": false,
         "disabled": false
-      }
+    },
+    {
+        "botId": "bonk_67bb5c7d2d265",
+        "serverIp": "localhost",
+        "serverPort": 19132,
+        "disabled": true
+    },
+    {
+        "botId": "bot_67bb5a6e5a764",
+        "serverIp": "laughtale.my.id",
+        "serverPort": 7040,
+        "disabled": false
+    },
+    {
+        "botId": "bonk_67bcd40922fc8",
+        "serverIp": "laughtale.my.id",
+        "serverPort": 7040,
+        "disabled": false
+    }
 ]

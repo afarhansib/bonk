@@ -38,13 +38,14 @@ fs.watch(configPath, (eventType) => {
             if (!botConfig || botConfig.disabled) {
                 console.log(`Stopping bot ${botId}`);
                 botData.bot?.stop();
-                activeBots.delete(botId);
+                const { ws, ...botDataRest } = activeBots.get(botId);
+                activeBots.set(botId, { bot: null, logs: [], ws });
             }
         }
 
         // Start new or enabled bots
         for (const config of newConfig) {
-            if (!config.disabled && !activeBots.has(config.botId)) {
+            if (!config.disabled && (!activeBots.has(config.botId) || activeBots.get(config.botId)?.bot === null)) {
                 startBotFromConfig(config);
             }
         }
@@ -63,9 +64,9 @@ const wss = new WebSocketServer({ noServer: true });
 
 // Move CORS middleware before other middleware
 app.use(cors({
-    origin: ['http://localhost:5500', 'http://127.0.0.1:5500'],
-    methods: ['GET', 'POST'],
-    allowedHeaders: ['Content-Type', 'x-api-key']
+    origin: ['http://localhost:5500', 'http://127.0.0.1:5500', 'http://localhost:8001'],
+    methods: ['GET', 'POST', 'DELETE'],
+    allowedHeaders: ['Content-Type', 'x-api-key', 'Authorization']
 }));
 
 // Middleware to check API key
@@ -143,13 +144,11 @@ async function startBotFromConfig(config) {
 
 // Start a bot instance through API
 app.post('/bot/start', async (req, res) => {
-    const {
-        botId,
-        serverIp = 'localhost',
-        serverPort = 19132,
-        botUsername = 'Bonk',
-        botOfflineMode = false
-    } = req.body;
+    const botId = req.body.data.bot_id
+    const serverIp = req.body.data.server_ip
+    const serverPort = req.body.data.server_port
+    const botUsername = req.body.data.bot_username
+    const botOfflineMode = req.body.data.bot_offline_mode
 
     if (!botId) {
         return res.status(400).json({ error: 'botId is required' });
@@ -161,25 +160,33 @@ app.post('/bot/start', async (req, res) => {
     }
 
     try {
-        // Add new bot to config file
+        // Add new bot to config file or update existing bot
         const config = loadBotsConfig();
         const existingConfig = config.find(c => c.botId === botId);
         
-        if (!existingConfig) {
+        if (existingConfig) {
+            // Update existing bot details
+            existingConfig.serverIp = serverIp;
+            existingConfig.serverPort = serverPort;
+            existingConfig.botUsername = botUsername;
+            existingConfig.botOfflineMode = botOfflineMode;
+            existingConfig.disabled = false; // Set disabled to false when starting
+        } else {
+            // Add new bot to config
             config.push({
                 botId,
                 serverIp,
                 serverPort,
                 botUsername,
                 botOfflineMode,
-                disabled: false
+                disabled: false // Set disabled to false when starting
             });
-            
-            fs.writeFileSync(configPath, JSON.stringify(config, null, 4));
         }
 
+        fs.writeFileSync(configPath, JSON.stringify(config, null, 4));
+
         // Bot will be started by the file watcher
-        res.json({ status: 'Bot configuration added' });
+        res.json({ status: 'Bot configuration added or updated' });
     } catch (error) {
         console.error('Error starting bot:', error);
         res.status(500).json({ error: 'Failed to start bot' });
@@ -189,15 +196,27 @@ app.post('/bot/start', async (req, res) => {
 // Stop a bot instance
 app.post('/bot/stop', (req, res) => {
     const { botId } = req.body;
+    console.log('Current active bots:', Array.from(activeBots.keys())); // Log active bot IDs
     const { bot } = activeBots.get(botId);
 
+    // Update the config to set disabled to true
+    const config = loadBotsConfig();
+    const existingConfig = config.find(c => c.botId === botId);
+    if (existingConfig) {
+        existingConfig.disabled = true; // Set disabled to true when stopping
+        fs.writeFileSync(configPath, JSON.stringify(config, null, 4));
+    }
+
     if (!bot) {
-        return res.status(404).json({ error: 'Bot not found' });
+        // return res.status(404).json({ error: 'Bot not found' });
+        return res.json({ status: 'already stopped', botId });
     }
 
     try {
         bot.stop();
-        activeBots.delete(botId);
+        const { ws, ...botDataRest } = activeBots.get(botId);
+        activeBots.set(botId, { ...botDataRest, bot: null, ws });
+
         res.json({ status: 'stopped', botId });
     } catch (error) {
         res.status(500).json({ error: error.message });
