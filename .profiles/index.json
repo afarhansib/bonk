@@ -39,6 +39,6 @@
         "botId": "bonk_67bcd40922fc8",
         "serverIp": "laughtale.my.id",
         "serverPort": 7040,
-        "disabled": false
+        "disabled": true
     }
 ]

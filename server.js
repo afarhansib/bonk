@@ -8,6 +8,7 @@ import fs from 'fs';
 import { fileURLToPath } from 'url';
 import crypto from 'crypto';
 import { colors, getFormattedTimestamp } from './utils/logger.js';
+import { Tunnel } from "cloudflared";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -324,3 +325,24 @@ server.on('upgrade', (request, socket, head) => {
         socket.destroy();
     }
 });
+
+async function startTunnel() {
+    const tunnel = Tunnel.withToken(process.env.CFTOKEN);
+    
+    // // show the url
+    // const url = new Promise((resolve) => tunnel.once("url", resolve));
+    // console.log("LINK:", await url);
+    
+    // // wait for connection to be established
+    // const conn = new Promise((resolve) => tunnel.once("connected", resolve));
+    // console.log("CONN:", await conn);
+    
+    // // stop the tunnel after 15 seconds
+    // setTimeout(tunnel.stop, 15_000);
+    
+    // tunnel.on("exit", (code) => {
+    //     console.log("tunnel process exited with code", code);
+    // });
+}
+
+startTunnel();
