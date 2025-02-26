@@ -13,6 +13,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const langStrings = loadLangFile()
 
 const onlinePlayers = new Map()
+let runtimeEntityId
 
 export default class BonkBot {
     constructor(options = null) {
@@ -34,6 +35,8 @@ export default class BonkBot {
 
         this.currentSlot = 0;
         this.inventory = {};
+
+        this.pickedRealm = null;
     }
 
     async connect() {
@@ -72,7 +75,7 @@ export default class BonkBot {
                     this.client = null;
                 }
 
-                this.client = bedrock.createClient({
+                const clientOptions = {
                     host: this.config.host,
                     port: this.config.port,
                     username: this.config.username,
@@ -93,7 +96,29 @@ export default class BonkBot {
                             log('AUTH', code?.message);
                         }
                     },
-                })
+                }
+
+                if (process.env.REALM === 'true') {
+                    clientOptions.realms = {
+                        pickRealm: async realms => {
+                            if (process.env.REALM_NUMBER >= 0) {
+                                this.pickedRealm = Number(process.env.REALM_NUMBER) - 1
+                            } else {
+                                realms.forEach((realm, index) => {
+                                    console.log(`${index + 1}: ${realm.state} - Realm: ${realm.name} - ${realm.motd}`);
+                                });
+                                console.log('Select a realm:')
+                                // Wait until the sendChat command has been executed
+                                while (this.pickedRealm === null) {
+                                    await new Promise(resolve => setTimeout(resolve, 100)); // Check every 100ms
+                                }
+                            }
+                            return realms[this.pickedRealm]
+                        } // Function which recieves an array of joined/owned Realms and must return a single Realm. Can be async
+                    }
+                }
+
+                this.client = bedrock.createClient(clientOptions)
                 this.setupEventHandlers();
                 this.reconnectAttempts = 0;
                 this.isServerDown = false;
@@ -107,10 +132,20 @@ export default class BonkBot {
     }
 
     sendChat(message) {
-        if (!this.client || !this.client.queue) {
-            this.logger('Client is not connected. Cannot send chat message.');
+        // console.log(runtimeEntityId)
+        // console.log(this.pickedRealm)
+        // if (!this.client || !this.client.queue) {
+        if (runtimeEntityId === undefined) {
+            // this.logger('Client is not connected. Cannot send chat message.');
+            try {
+                this.pickedRealm = Number(message) - 1
+                // console.log(this.pickedRealm)
+            } catch (error) {
+                this.logger('Error parsing realm number:', error);
+            }
             return;
         }
+        // console.log('sending chat')
         this.client.queue('text', {
             type: 'chat',
             needs_translation: false,
@@ -130,8 +165,6 @@ export default class BonkBot {
 
     setupEventHandlers() {
         this.logger('Setting up event handlers...')
-
-        let runtimeEntityId;
 
         this.client.on('start_game', (packet) => {
             runtimeEntityId = packet.runtime_entity_id
@@ -251,11 +284,12 @@ export default class BonkBot {
                 case 'chat':
                     const playerName = packet.source_name;
                     const chatMessage = packet.message;
+                    // console.log(packet)
                     if (this.isCustomLogger) {
                         this.logger(`CHAT: <${playerName}> ${chatMessage}`);
                     } else {
-                        const cleanText = removeFormattingCodes(chatText);
-                        log(`CHAT`, `${cleanText}`);
+                        const cleanText = removeFormattingCodes(chatMessage);
+                        log(`CHAT`, `<${playerName}> ${cleanText}`);
                     }
                     break;
 
