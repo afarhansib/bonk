@@ -12,6 +12,8 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 const langStrings = loadLangFile()
 
+const onlinePlayers = new Map()
+
 export default class BonkBot {
     constructor(options = null) {
         this.client = null;
@@ -252,6 +254,7 @@ export default class BonkBot {
                     if (this.isCustomLogger) {
                         this.logger(`CHAT: <${playerName}> ${chatMessage}`);
                     } else {
+                        const cleanText = removeFormattingCodes(chatText);
                         log(`CHAT`, `${cleanText}`);
                     }
                     break;
@@ -267,7 +270,79 @@ export default class BonkBot {
         })
 
         this.client.on('packet', (packet) => {
-            // this.logger(packet)
+            const logFilePath = path.join(__dirname, 'packet_log.txt');
+            const packetName = packet?.data?.name;
+            // if (!['level_chunk', 'move_player', 'current_structure_feature'].includes(packetName)) {
+            //     this.logger(packet?.data);
+            // }
+            function safeStringify(obj) {
+                return JSON.stringify(obj, (key, value) => {
+                    // Check if the value is a BigInt
+                    if (typeof value === 'bigint') {
+                        return value.toString(); // Convert BigInt to string
+                    }
+                    return value; // Return the value as is
+                }, 2); // Pretty print with 2 spaces
+            }
+            // if (['player_list', 'start_game'].includes(packetName)) {
+            //     // this.logger(packet?.data);
+            //     if (this.isCustomLogger) {
+            //         this.logger(`PACKET: ${safeStringify(packet?.data)}`);
+            //     } else {
+            //         log(`PACKET`, `${safeStringify(packet?.data)}`);
+            //     }
+            // }
+            if (packetName === 'start_game') {
+                // console.log(packet?.data)
+                const position = packet?.data?.params?.player_position;
+                const dimension = packet?.data?.params?.dimension;
+                if (position) {
+                    const { x, y, z } = position; // Destructure the coordinates
+                    const logMessage = `Bonk's position - X: ${x.toFixed(2)}, Y: ${y.toFixed(2)}, Z: ${z.toFixed(2)} (${dimension})`; // Format the message
+
+                    if (this.isCustomLogger) {
+                        this.logger('EVENT:' + logMessage);
+                    } else {
+                        log(`EVENT`, logMessage);
+                    }
+                }
+            }
+
+            if (packet?.data?.name === 'player_list') {
+                const records = packet?.data?.params?.records?.records;
+
+                records.forEach(record => {
+                    const playerName = record.username; // Get the username
+                    const playerUUID = record.uuid; // Get the UUID
+
+                    switch (packet?.data?.params?.records?.type) {
+                        case 'add':
+                            onlinePlayers.set(playerUUID, playerName); // Store the UUID and username
+                            break;
+                        case 'remove':
+                            onlinePlayers.delete(playerUUID); // Remove the player by UUID
+                            break;
+                    }
+                });
+
+                const playerCount = onlinePlayers.size; // Count the number of players
+                const playerList = Array.from(onlinePlayers.values()).join(', '); // Create a comma-separated list of usernames
+
+                const logMessage = `Total players online: ${playerCount} | Players: ${playerList}`;
+
+                if (this.isCustomLogger) {
+                    this.logger(`EVENT: ${logMessage}`);
+                } else {
+                    log(`EVENT`, `${logMessage}`);
+                }
+            }
+
+            // Append the packet name to the log file
+            // fs.appendFile(logFilePath, `${new Date().toISOString()}: ${packetName}\n`, (err) => {
+            //     if (err) {
+            //         console.error('Error writing to log file:', err);
+            //     }
+            // });
             if (packet?.data?.name === 'player_skin') {
                 const skinsDir = path.join(__dirname, 'skins');
                 if (!fs.existsSync(skinsDir)) {

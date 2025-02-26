@@ -5,7 +5,7 @@
         "serverPort": 19132,
         "botUsername": "Bonk",
         "botOfflineMode": true,
-        "disabled": false
+        "disabled": true
     },
     {
         "botId": "0195333b-73fa-7a54-ab8e-8772b4582b08",
@@ -21,7 +21,7 @@
         "serverPort": 7040,
         "botUsername": "sayaafk",
         "botOfflineMode": false,
-        "disabled": false
+        "disabled": true
     },
     {
         "botId": "bonk_67bb5c7d2d265",
