@@ -101,7 +101,7 @@ export default class BonkBot {
                 if (process.env.REALM === 'true') {
                     clientOptions.realms = {
                         pickRealm: async realms => {
-                            if (process.env.REALM_NUMBER >= 0) {
+                            if (process.env.REALM_NUMBER > 0) {
                                 this.pickedRealm = Number(process.env.REALM_NUMBER) - 1
                             } else {
                                 realms.forEach((realm, index) => {
