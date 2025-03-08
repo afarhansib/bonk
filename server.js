@@ -263,19 +263,39 @@ app.post('/bot/logs/token', (req, res) => {
     res.json({ token });
 });
 
-const PORT = process.env.PORT || 3000;
-const server = app.listen(PORT, () => {
-    console.log(`Bonk API server running on port ${PORT}`);
-    
-    // Start all enabled bots from config
-    const configs = loadBotsConfig();
+// Function to introduce a delay
+function delay(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+// Start all enabled bots from config with delays
+async function startBotsWithDelay(configs) {
+    // Wait 100 seconds before starting the first bot
+    await delay(100 * 1000);
+
+    // Start each bot with a 10-second delay between them
     for (const config of configs) {
         if (!config.disabled) {
-            startBotFromConfig(config).catch(err => {
+            try {
+                console.log(`Starting bot ${config.botId}...`);
+                startBotFromConfig(config);
+                await delay(10 * 1000); // Wait 10 seconds before starting the next bot
+            } catch (err) {
                 console.error(`Failed to start bot ${config.botId}:`, err);
-            });
+            }
         }
     }
+}
+
+const PORT = process.env.PORT || 3000;
+const server = app.listen(PORT, async () => {
+    console.log(`Bonk API server running on port ${PORT}`);
+    
+    // Load bot configurations
+    const configs = loadBotsConfig();
+
+    // Start bots with delays
+    await startBotsWithDelay(configs);
 });
 
 // Update the upgrade handler
